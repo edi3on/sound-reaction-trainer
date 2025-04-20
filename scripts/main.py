@@ -32,6 +32,12 @@ def play_sound(sound_path):
     if sound_path:
         sound = pygame.mixer.Sound(sound_path)
         sound.play()
+        return sound  # Return the sound object so it can be stopped later
+    return None
+
+def stop_sound(sound_obj):
+    if sound_obj:
+        sound_obj.stop()
 
 def log_result(username, round_num, reaction_time):
     os.makedirs(os.path.dirname(RESULTS_FILE), exist_ok=True)
@@ -88,7 +94,7 @@ def main():
         input(f"Round {round_num}: Press ENTER to get ready...")
 
         print("Set...")
-        play_sound(get_random_sound(SET_SOUND_DIR))
+        set_sound = play_sound(get_random_sound(SET_SOUND_DIR))
         wait_time = random.uniform(1.5, 2.5)
 
         start = time.time()
@@ -104,22 +110,31 @@ def main():
         if false_start:
             print("🚫 False start! You pressed too early.")
             time.sleep(1.5)
+            stop_sound(set_sound)  # Stop the set sound if false start occurs
             continue
 
         print("GO!")
-        play_sound(get_random_sound(GUN_SOUND_DIR))
+        gun_sound = play_sound(get_random_sound(GUN_SOUND_DIR))
         start_time = time.time()
 
+        # Wait for the user to press space after the gunshot
         while True:
             if keyboard.is_pressed('space'):
                 reaction = time.time() - start_time
                 break
             time.sleep(0.001)
 
-        reaction_times.append(reaction)
-        log_result(username, round_num, reaction)
-        avg_time = sum(reaction_times) / len(reaction_times)
-        print(f"✅ Reaction Time: {reaction:.3f} sec | Avg: {avg_time:.3f} sec")
+        # Stop the gunshot sound once the user reacts
+        stop_sound(gun_sound)
+
+        # Filter out invalid reaction times (flukes)
+        if 0.099 <= reaction <= 0.350:
+            reaction_times.append(reaction)
+            log_result(username, round_num, reaction)
+            avg_time = sum(reaction_times) / len(reaction_times)
+            print(f"✅ Reaction Time: {reaction:.3f} sec | Avg: {avg_time:.3f} sec")
+        else:
+            print(f"🚫 Invalid reaction time ({reaction:.3f} sec). Try again.")
 
         round_num += 1
         next_action = input("Press ENTER to continue or 'q' to quit: ").strip().lower()
