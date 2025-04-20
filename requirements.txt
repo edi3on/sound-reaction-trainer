@@ -1,0 +1,4 @@
+pygame
+keyboard
+matplotlib
+python-dotenv
