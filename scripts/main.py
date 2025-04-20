@@ -4,6 +4,7 @@ import random
 import pygame
 import keyboard
 import matplotlib.pyplot as plt
+import statistics
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -32,7 +33,7 @@ def play_sound(sound_path):
     if sound_path:
         sound = pygame.mixer.Sound(sound_path)
         sound.play()
-        return sound  # Return the sound object so it can be stopped later
+        return sound
     return None
 
 def stop_sound(sound_obj):
@@ -60,11 +61,11 @@ def parse_results():
     return users
 
 def show_leaderboard(users):
-    print("\n🏆 Leaderboard - Fastest Reactions:")
-    all_best = [(user, min(times)) for user, times in users.items()]
-    top5 = sorted(all_best, key=lambda x: x[1])[:5]
-    for i, (user, best) in enumerate(top5, 1):
-        print(f"{i}. {user}: {best:.3f} sec")
+    print("\n🏆 Leaderboard - Fastest Reactions (unique sessions):")
+    all_stats = [(user, min(times), statistics.median(times)) for user, times in users.items() if len(times) > 0]
+    top5 = sorted(all_stats, key=lambda x: x[1])[:5]
+    for i, (user, best, med) in enumerate(top5, 1):
+        print(f"{i}. {user} - Best: {best:.3f} sec | Median: {med:.3f} sec")
 
 def show_graph(username, times):
     plt.figure(figsize=(10, 5))
@@ -100,7 +101,6 @@ def main():
         start = time.time()
         false_start = False
 
-        # False start checker during wait time
         while time.time() - start < wait_time:
             if keyboard.is_pressed('space'):
                 false_start = True
@@ -110,29 +110,28 @@ def main():
         if false_start:
             print("🚫 False start! You pressed too early.")
             time.sleep(1.5)
-            stop_sound(set_sound)  # Stop the set sound if false start occurs
+            stop_sound(set_sound)
             continue
 
+        stop_sound(set_sound)
         print("GO!")
         gun_sound = play_sound(get_random_sound(GUN_SOUND_DIR))
         start_time = time.time()
 
-        # Wait for the user to press space after the gunshot
         while True:
             if keyboard.is_pressed('space'):
                 reaction = time.time() - start_time
                 break
             time.sleep(0.001)
 
-        # Stop the gunshot sound once the user reacts
         stop_sound(gun_sound)
 
-        # Filter out invalid reaction times (flukes)
         if 0.099 <= reaction <= 0.350:
             reaction_times.append(reaction)
             log_result(username, round_num, reaction)
             avg_time = sum(reaction_times) / len(reaction_times)
-            print(f"✅ Reaction Time: {reaction:.3f} sec | Avg: {avg_time:.3f} sec")
+            med_time = statistics.median(reaction_times)
+            print(f"✅ Reaction Time: {reaction:.3f} sec | Avg: {avg_time:.3f} sec | Median: {med_time:.3f} sec")
         else:
             print(f"🚫 Invalid reaction time ({reaction:.3f} sec). Try again.")
 
@@ -141,19 +140,20 @@ def main():
         if next_action == 'q':
             break
 
-    # Session summary
     print("\n📊 Session Summary:")
-    print(f"Rounds played: {len(reaction_times)}")
-    print(f"Best: {min(reaction_times):.3f} sec")
-    print(f"Worst: {max(reaction_times):.3f} sec")
-    print(f"Average: {sum(reaction_times)/len(reaction_times):.3f} sec")
+    if reaction_times:
+        print(f"Rounds played: {len(reaction_times)}")
+        print(f"Best: {min(reaction_times):.3f} sec")
+        print(f"Worst: {max(reaction_times):.3f} sec")
+        print(f"Average: {sum(reaction_times)/len(reaction_times):.3f} sec")
+        print(f"Median: {statistics.median(reaction_times):.3f} sec")
+    else:
+        print("No valid reaction times recorded.")
 
-    # Leaderboard
     all_users = parse_results()
     show_leaderboard(all_users)
-
-    # Graph
-    show_graph(username, reaction_times)
+    if reaction_times:
+        show_graph(username, reaction_times)
 
 if __name__ == "__main__":
     main()
